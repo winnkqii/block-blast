@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Block Blast — Игра для соцсети</title>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: radial-gradient(circle at 50% 0%, #1e2235 0%, #0f111a 100%);
+            color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+        .glass-panel {
+            background: rgba(30, 34, 53, 0.78);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .cube-shadow {
+            box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.28),
+                        inset 0 -3px 0 rgba(0, 0, 0, 0.28),
+                        0 4px 10px rgba(0, 0, 0, 0.35);
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.4); opacity: 0; }
+            70% { transform: scale(1.12); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes pulseCombo {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        .animate-pop {
+            animation: popIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        .animate-combo {
+            animation: pulseCombo 0.5s ease-in-out;
+        }
+        /* Hide scrollbars in modals */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-2 sm:p-4">
+
+    <!-- Top Social Bar (VK / huEVO Mini-App Header) -->
+    <header class="w-full max-w-md glass-panel rounded-2xl px-3.5 py-2.5 mb-2 flex items-center justify-between shadow-lg">
+        <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center font-black text-white text-base shadow-md">
+                🧩
+            </div>
+            <div>
+                <div class="flex items-center gap-1.5">
+                    <h1 class="font-extrabold text-sm sm:text-base tracking-tight text-white leading-none">Block Blast</h1>
+                    <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">8×8</span>
+                </div>
+                <p id="modeSubtitle" class="text-[11px] text-slate-400 leading-tight mt-0.5">Сетка 8×8 • Собирай линии и комбо</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+            <button id="btnToggleSound" type="button" title="Звук Вкл/Выкл" class="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 active:scale-95 transition flex items-center justify-center text-slate-200 border border-white/5">
+                <span id="soundIcon" class="text-base">🔊</span>
+            </button>
+            <button id="btnOpenLeaderboard" type="button" title="Таблица лидеров" class="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 active:scale-95 transition flex items-center justify-center text-amber-400 border border-white/5">
+                <span class="text-base">🏆</span>
+            </button>
+            <button id="btnOpenPublish" type="button" title="Как загрузить игру на сайт" class="px-2.5 h-9 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 transition flex items-center gap-1 text-xs font-bold text-white shadow-md shadow-indigo-600/30">
+                <span>🚀</span>
+                <span class="hidden sm:inline">На сайт</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Scoreboard & Boosters -->
+    <div class="w-full max-w-md flex flex-col gap-2 mb-2">
+        <div class="grid grid-cols-3 gap-2">
+            <div class="glass-panel rounded-xl px-3 py-2 flex flex-col justify-center">
+                <span class="text-[10px] uppercase tracking-wider font-semibold text-slate-400">Счёт</span>
+                <span id="scoreDisplay" class="text-lg sm:text-xl font-black text-white tabular-nums leading-tight">0</span>
+            </div>
+
+            <div class="glass-panel rounded-xl px-3 py-2 flex flex-col justify-center">
+                <span class="text-[10px] uppercase tracking-wider font-semibold text-amber-400/90 flex items-center gap-1">
+                    <span>👑</span> Рекорд
+                </span>
+                <span id="bestScoreDisplay" class="text-lg sm:text-xl font-black text-amber-300 tabular-nums leading-tight">0</span>
+            </div>
+
+            <div class="glass-panel rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-1">
+                <button id="btnUseHammer" type="button" title="Молоток: разбить любую клетку" class="flex-1 h-full rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 active:scale-95 transition flex flex-col items-center justify-center py-1 relative">
+                    <span class="text-sm leading-none">🔨</span>
+                    <span class="text-[10px] font-bold text-rose-300 mt-0.5">×<span id="hammerCount">3</span></span>
+                </button>
+                <button id="btnUseReroll" type="button" title="Обновить фигуры" class="flex-1 h-full rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 active:scale-95 transition flex flex-col items-center justify-center py-1 relative">
+                    <span class="text-sm leading-none">🔄</span>
+                    <span class="text-[10px] font-bold text-cyan-300 mt-0.5">×<span id="rerollCount">3</span></span>
+                </button>
+                <button id="btnRestartGame" type="button" title="Начать заново" class="w-8 h-full rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-95 transition flex items-center justify-center text-slate-300 text-xs">
+                    ↺
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hammer Active Banner -->
+    <div id="hammerBanner" class="hidden w-full max-w-md mb-2 px-3 py-1.5 rounded-xl bg-rose-600/90 text-white text-xs font-bold flex items-center justify-between shadow-lg animate-pulse">
+        <span>🔨 Выберите любой блок на поле, чтобы разбить его!</span>
+        <button id="btnCancelHammer" type="button" class="underline ml-2 text-[11px] font-extrabold">Отмена</button>
+    </div>
+
+    <!-- Main Game Canvas Area -->
+    <main class="relative w-full max-w-md flex-1 flex flex-col items-center justify-center">
+        <!-- Floating Combo / Status Badge -->
+        <div id="comboFloatingBadge" class="pointer-events-none opacity-0 transition-all duration-300 transform -translate-y-2 mb-1 px-3 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 text-white font-black text-xs shadow-lg">
+            КОМБО ×2! +120
+        </div>
+
+        <!-- Canvas Wrapper -->
+        <div id="canvasContainer" class="w-full aspect-square max-h-[62vh] sm:max-h-[66vh] glass-panel rounded-2xl p-2 sm:p-3 flex flex-col items-center justify-center relative shadow-2xl overflow-hidden">
+            <canvas id="gameCanvas" class="w-full h-full rounded-xl cursor-pointer touch-none"></canvas>
+        </div>
+
+        <!-- Bottom Action / Helper Bar -->
+        <div class="w-full mt-2 flex items-center justify-between text-xs text-slate-400 px-1">
+            <div class="flex items-center gap-2">
+                <span id="streakIndicator" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800/90 text-slate-300 font-semibold border border-white/5">
+                    🔥 Серия комбо: <strong id="streakValue" class="text-amber-400">0</strong>
+                </span>
+            </div>
+            <button id="btnOpenRules" type="button" class="text-slate-400 hover:text-white transition font-medium underline underline-offset-2">
+                Правила игры
+            </button>
+        </div>
+    </main>
+
+    <!-- Game Over Modal -->
+    <div id="modalGameOver" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="w-full max-w-sm glass-panel rounded-3xl p-6 text-center border border-white/15 shadow-2xl animate-pop">
+            <div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center text-3xl shadow-lg">
+                🏆
+            </div>
+            <h2 id="gameOverTitle" class="text-2xl font-black text-white mb-1">Ходы закончились!</h2>
+            <p id="gameOverSubtitle" class="text-xs text-slate-300 mb-5">Отличная партия! Попробуешь побить рекорд?</p>
+
+            <div class="grid grid-cols-2 gap-3 mb-5">
+                <div class="bg-slate-900/90 rounded-2xl p-3 border border-white/5">
+                    <div class="text-[11px] text-slate-400 uppercase font-bold">Ваш счёт</div>
+                    <div id="finalScoreText" class="text-2xl font-black text-white mt-0.5">0</div>
+                </div>
+                <div class="bg-slate-900/90 rounded-2xl p-3 border border-amber-500/20">
+                    <div class="text-[11px] text-amber-400 uppercase font-bold">Лучший</div>
+                    <div id="finalBestText" class="text-2xl font-black text-amber-300 mt-0.5">0</div>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-2.5">
+                <button id="btnPlayAgainModal" type="button" class="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-98 transition font-extrabold text-white shadow-lg shadow-indigo-600/30">
+                    Играть ещё раз
+                </button>
+                <button id="btnShareScoreModal" type="button" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-98 transition font-bold text-slate-200 text-xs flex items-center justify-center gap-1.5 border border-white/10">
+                    <span>📋</span> Скопировать результат для друзей
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaderboard Modal -->
+    <div id="modalLeaderboard" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="w-full max-w-md glass-panel rounded-3xl p-5 border border-white/15 shadow-2xl animate-pop">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🏆</span>
+                    <h2 class="text-lg font-extrabold text-white">Топ игроков Block Blast</h2>
+                </div>
+                <button id="btnCloseLeaderboard" type="button" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 font-bold">✕</button>
+            </div>
+
+            <div id="leaderboardList" class="space-y-2 mb-4 max-h-72 overflow-y-auto no-scrollbar">
+                <!-- Populated dynamically -->
+            </div>
+
+            <div class="bg-slate-900/80 rounded-xl p-3 border border-white/5 flex items-center gap-2">
+                <input id="playerNameInput" type="text" maxlength="18" placeholder="Ваш никнейм" value="Вы (Игрок)" class="flex-1 bg-slate-800 text-white text-xs font-semibold px-3 py-2 rounded-lg border border-white/10 focus:outline-none focus:border-indigo-500">
+                <button id="btnSavePlayerName" type="button" class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition">
+                    Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Publish to huEVO / VK Modal -->
+    <div id="modalPublish" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="w-full max-w-lg glass-panel rounded-3xl p-5 sm:p-6 border border-white/15 shadow-2xl animate-pop max-h-[90vh] overflow-y-auto no-scrollbar">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🚀</span>
+                    <h2 class="text-base sm:text-lg font-extrabold text-white">Подключение игры в «Новое приложение»</h2>
+                </div>
+                <button id="btnClosePublish" type="button" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 font-bold">✕</button>
+            </div>
+
+            <p class="text-xs text-slate-300 leading-relaxed mb-4">
+                Игра <strong>Block Blast</strong> полностью готова к работе внутри <strong>iframe</strong> (для <strong>huEVO</strong>, <strong>VK Mini Apps</strong> или любого вашего сайта).
+            </p>
+
+            <div class="space-y-3 text-xs">
+                <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-indigo-500/30">
+                    <div class="font-bold text-indigo-300 mb-1">Шаг 1. Скачайте файл игры</div>
+                    <p class="text-slate-300 leading-relaxed">
+                        Сохраните этот HTML-файл и переименуйте его в <code class="px-1.5 py-0.5 rounded bg-slate-800 text-amber-300">index.html</code>. Внутри него уже встроены стили, графика, звуки и сохранения.
+                    </p>
+                </div>
+
+                <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-emerald-500/30">
+                    <div class="font-bold text-emerald-300 mb-1">Шаг 2. Залейте на бесплатный HTTPS-хостинг (за 1 минуту)</div>
+                    <p class="text-slate-300 leading-relaxed mb-2">
+                        Так как платформа открывает игру во фрейме (<code class="text-emerald-300">https://...</code>), загрузите <code class="text-amber-300">index.html</code> на любой бесплатный хостинг статических сайтов:
+                    </p>
+                    <ul class="list-disc list-inside space-y-1 text-slate-300">
+                        <li><strong>GitHub Pages</strong> или <strong>Vercel</strong> — бесплатный домен вида <code class="text-slate-200">https://block-blast.vercel.app</code></li>
+                        <li><strong>Netlify Drop</strong> (app.netlify.com/drop) — просто перетащите папку с файлом <code class="text-amber-300">index.html</code> мышкой в браузер</li>
+                    </ul>
+                </div>
+
+                <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-amber-500/30">
+                    <div class="font-bold text-amber-300 mb-1">Шаг 3. Вставьте ссылку в поле «Адрес игры»</div>
+                    <p class="text-slate-300 leading-relaxed">
+                        В окне создания приложения укажите:<br>
+                        • <strong>Тип:</strong> Игра<br>
+                        • <strong>Название:</strong> Block Blast<br>
+                        • <strong>Адрес игры:</strong> ваша полученная HTTPS-ссылка, затем нажмите <strong>«Создать»</strong>!
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-4 flex justify-end">
+                <button id="btnGotItPublish" type="button" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition">
+                    Понятно, спасибо!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rules Modal -->
+    <div id="modalRules" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="w-full max-w-md glass-panel rounded-3xl p-5 border border-white/15 shadow-2xl animate-pop">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-lg font-extrabold text-white">📖 Правила Block Blast</h2>
+                <button id="btnCloseRules" type="button" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 font-bold">✕</button>
+            </div>
+
+            <div class="space-y-3 text-xs text-slate-300 leading-relaxed">
+                <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5">
+                    <div class="font-bold text-indigo-400 mb-1">🧩 Заполняйте сетку 8×8</div>
+                    Перетаскивайте 3 цветные фигуры снизу на свободные клетки поля. Как только вы выставите все 3 фигуры, появится новая тройка.
+                </div>
+                <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5">
+                    <div class="font-bold text-amber-400 mb-1">🔥 Взрывайте линии и копите КОМБО</div>
+                    Когда любая горизонтальная строка или вертикальный столбец из 8 клеток заполняется целиком — блоки взрываются! Очищайте линии подряд, чтобы увеличивать множитель серии.
+                </div>
+                <div class="p-3 rounded-xl bg-slate-900/80 border border-white/5">
+                    <div class="font-bold text-rose-400 mb-1">🔨 Бустеры в трудный момент</div>
+                    Используйте <strong>Молоток</strong>, чтобы разбить любой мешающий блок на поле, или <strong>Обновление</strong>, чтобы заменить текущие 3 фигуры на новые.
+                </div>
+            </div>
+
+            <button id="btnCloseRulesBottom" type="button" class="w-full mt-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition">
+                Играть!
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toastNotification" class="pointer-events-none fixed bottom-5 left-1/2 -translate-x-1/2 z-50 opacity-0 transition-all duration-300 px-4 py-2 rounded-xl bg-slate-900/95 border border-indigo-500/40 text-white text-xs font-bold shadow-xl">
+        Скопировано!
+    </div>
+
+    <script>
+        (function() {
+            // =========================================================================
+            // SAFE STORAGE & AUDIO ENGINE (Web Audio API Synthesizer)
+            // =========================================================================
+            const Storage = {
+                get(key, fallback) {
+                    try {
+                        const val = localStorage.getItem(key);
+                        return val !== null ? JSON.parse(val) : fallback;
+                    } catch (e) {
+                        return fallback;
+                    }
+                },
+                set(key, value) {
+                    try {
+                        localStorage.setItem(key, JSON.stringify(value));
+                    } catch (e) {}
+                }
+            };
+
+            const SoundFX = {
+                ctx: null,
+                enabled: true,
+                init() {
+                    if (!this.ctx) {
+                        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                        if (AudioCtx) this.ctx = new AudioCtx();
+                    }
+                    if (this.ctx && this.ctx.state === 'suspended') {
+                        this.ctx.resume();
+                    }
+                },
+                playTone(freq, type, duration, vol = 0.12, slideFreq = null) {
+                    if (!this.enabled) return;
+                    try {
+                        this.init();
+                        if (!this.ctx) return;
+                        const now = this.ctx.currentTime;
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = type;
+                        osc.frequency.setValueAtTime(freq, now);
+                        if (slideFreq) {
+                            osc.frequency.exponentialRampToValueAtTime(slideFreq, now + duration);
+                        }
+                        gain.gain.setValueAtTime(vol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now);
+                        osc.stop(now + duration);
+                    } catch (e) {}
+                },
+                pick() {
+                    this.playTone(320, 'sine', 0.07, 0.1, 480);
+                },
+                place() {
+                    this.playTone(220, 'triangle', 0.1, 0.15, 160);
+                },
+                clear(lines = 1) {
+                    const base = 440 + Math.min(lines, 5) * 80;
+                    this.playTone(base, 'triangle', 0.18, 0.16, base * 1.4);
+                    setTimeout(() => this.playTone(base * 1.25, 'sine', 0.22, 0.14, base * 1.8), 65);
+                },
+                smash() {
+                    this.playTone(140, 'sawtooth', 0.2, 0.16, 55);
+                },
+                gameOver() {
+                    this.playTone(300, 'sawtooth', 0.25, 0.12, 180);
+                    setTimeout(() => this.playTone(220, 'sawtooth', 0.35, 0.12, 110), 200);
+                }
+            };
+
+            // =========================================================================
+            // GAME CONSTANTS & SHAPES
+            // =========================================================================
+            const BLAST_PALETTE = [
+                { fill: '#6366f1', light: '#818cf8', dark: '#4338ca' }, // Indigo
+                { fill: '#ec4899', light: '#f472b6', dark: '#be185d' }, // Pink
+                { fill: '#10b981', light: '#34d399', dark: '#047857' }, // Emerald
+                { fill: '#f59e0b', light: '#fbbf24', dark: '#b45309' }, // Amber
+                { fill: '#06b6d4', light: '#22d3ee', dark: '#0e7490' }, // Cyan
+                { fill: '#8b5cf6', light: '#a78bfa', dark: '#6d28d9' }, // Violet
+                { fill: '#f43f5e', light: '#fb7185', dark: '#be123c' }  // Rose
+            ];
+
+            const BLAST_SHAPES = [
+                [[1]],
+                [[1, 1]],
+                [[1], [1]],
+                [[1, 1, 1]],
+                [[1], [1], [1]],
+                [[1, 1, 1, 1]],
+                [[1], [1], [1], [1]],
+                [[1, 1, 1, 1, 1]],
+                [[1], [1], [1], [1], [1]],
+                [[1, 1], [1, 1]],
+                [[1, 1, 1], [1, 1, 1], [1, 1, 1]],
+                [[1, 0], [1, 1]],
+                [[0, 1], [1, 1]],
+                [[1, 1], [1, 0]],
+                [[1, 1], [0, 1]],
+                [[1, 0, 0], [1, 0, 0], [1, 1, 1]],
+                [[0, 0, 1], [0, 0, 1], [1, 1, 1]],
+                [[1, 1, 1], [1, 0, 0], [1, 0, 0]],
+                [[1, 1, 1], [0, 0, 1], [0, 0, 1]],
+                [[1, 1, 1], [0, 1, 0]],
+                [[0, 1, 0], [1, 1, 1]],
+                [[1, 1, 0], [0, 1, 1]],
+                [[0, 1, 1], [1, 1, 0]]
+            ];
+
+            // =========================================================================
+            // STATE MANAGEMENT
+            // =========================================================================
+            let hammerActive = false;
+            let playerName = Storage.get('vk_game_player_name', 'Вы (Игрок)');
+
+            // Visual Particles & Floating Texts
+            let particles = [];
+            let floatingTexts = [];
+
+            // Block Blast State (8x8)
+            const blastState = {
+                rows: 8,
+                cols: 8,
+                grid: [],
+                tray: [null, null, null],
+                score: 0,
+                best: Storage.get('vk_blast_best', 0),
+                streak: 0,
+                hammers: 3,
+                rerolls: 3,
+                draggingIdx: -1,
+                dragX: 0,
+                dragY: 0,
+                hoverR: -1,
+                hoverC: -1,
+                isGameOver: false
+            };
+
+            // =========================================================================
+            // DOM ELEMENTS
+            // =========================================================================
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const canvasContainer = document.getElementById('canvasContainer');
+
+            const scoreDisplay = document.getElementById('scoreDisplay');
+            const bestScoreDisplay = document.getElementById('bestScoreDisplay');
+            const hammerCountEl = document.getElementById('hammerCount');
+            const rerollCountEl = document.getElementById('rerollCount');
+            const streakValueEl = document.getElementById('streakValue');
+            const hammerBanner = document.getElementById('hammerBanner');
+            const comboFloatingBadge = document.getElementById('comboFloatingBadge');
+
+            // Layout metrics calculated on resize
+            let metrics = {
+                w: 360,
+                h: 360,
+                dpr: 1,
+                boardX: 0,
+                boardY: 0,
+                boardSize: 0,
+                cellSize: 0,
+                trayY: 0,
+                trayH: 0
+            };
+
+            // =========================================================================
+            // INITIALIZATION
+            // =========================================================================
+            function initBlastGame() {
+                blastState.grid = Array.from({ length: 8 }, () => Array(8).fill(null));
+                blastState.score = 0;
+                blastState.streak = 0;
+                blastState.hammers = 3;
+                blastState.rerolls = 3;
+                blastState.draggingIdx = -1;
+                blastState.isGameOver = false;
+                hammerActive = false;
+                spawnBlastTray();
+                updateUI();
+            }
+
+            function spawnBlastTray() {
+                for (let i = 0; i < 3; i++) {
+                    const shape = BLAST_SHAPES[Math.floor(Math.random() * BLAST_SHAPES.length)];
+                    const color = BLAST_PALETTE[Math.floor(Math.random() * BLAST_PALETTE.length)];
+                    blastState.tray[i] = {
+                        shape,
+                        color,
+                        scale: 0.1 // animates to 1
+                    };
+                }
+            }
+
+            // =========================================================================
+            // RESIZE & CANVAS SCALING
+            // =========================================================================
+            function resizeCanvas() {
+                const rect = canvasContainer.getBoundingClientRect();
+                const pad = 16;
+                const availW = Math.max(260, rect.width - pad);
+                const availH = Math.max(260, rect.height - pad);
+                const size = Math.min(availW, availH);
+
+                metrics.dpr = window.devicePixelRatio || 1;
+                metrics.w = size;
+                metrics.h = size;
+
+                canvas.style.width = size + 'px';
+                canvas.style.height = size + 'px';
+                canvas.width = Math.floor(size * metrics.dpr);
+                canvas.height = Math.floor(size * metrics.dpr);
+
+                ctx.setTransform(metrics.dpr, 0, 0, metrics.dpr, 0, 0);
+
+                // Calculate Block Blast layout (top 72% board, bottom 26% tray)
+                const boardMax = size * 0.71;
+                metrics.cellSize = Math.floor(boardMax / 8);
+                metrics.boardSize = metrics.cellSize * 8;
+                metrics.boardX = Math.floor((size - metrics.boardSize) / 2);
+                metrics.boardY = Math.floor(size * 0.02);
+                metrics.trayY = metrics.boardY + metrics.boardSize + Math.floor(size * 0.03);
+                metrics.trayH = size - metrics.trayY - Math.floor(size * 0.01);
+            }
+
+            // =========================================================================
+            // BLOCK BLAST LOGIC
+            // =========================================================================
+            function canPlaceBlastShape(shape, startR, startC) {
+                for (let r = 0; r < shape.length; r++) {
+                    for (let c = 0; c < shape[r].length; c++) {
+                        if (shape[r][c]) {
+                            const gr = startR + r;
+                            const gc = startC + c;
+                            if (gr < 0 || gr >= 8 || gc < 0 || gc >= 8) return false;
+                            if (blastState.grid[gr][gc] !== null) return false;
+                        }
+                    }
+                }
+                return true;
+            }
+
+            function canAnyTrayPieceFit() {
+                for (let i = 0; i < 3; i++) {
+                    const item = blastState.tray[i];
+                    if (!item) continue;
+                    for (let r = 0; r < 8; r++) {
+                        for (let c = 0; c < 8; c++) {
+                            if (canPlaceBlastShape(item.shape, r, c)) return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            function placeBlastPiece(trayIdx, startR, startC) {
+                const item = blastState.tray[trayIdx];
+                if (!item || !canPlaceBlastShape(item.shape, startR, startC)) return false;
+
+                let blocksPlaced = 0;
+                for (let r = 0; r < item.shape.length; r++) {
+                    for (let c = 0; c < item.shape[r].length; c++) {
+                        if (item.shape[r][c]) {
+                            blastState.grid[startR + r][startC + c] = item.color;
+                            blocksPlaced++;
+                        }
+                    }
+                }
+
+                blastState.tray[trayIdx] = null;
+                SoundFX.place();
+
+                // Check full rows and columns
+                const fullRows = [];
+                const fullCols = [];
+
+                for (let r = 0; r < 8; r++) {
+                    if (blastState.grid[r].every(cell => cell !== null)) fullRows.push(r);
+                }
+                for (let c = 0; c < 8; c++) {
+                    let allFull = true;
+                    for (let r = 0; r < 8; r++) {
+                        if (blastState.grid[r][c] === null) {
+                            allFull = false;
+                            break;
+                        }
+                    }
+                    if (allFull) fullCols.push(c);
+                }
+
+                const totalLines = fullRows.length + fullCols.length;
+                let moveScore = blocksPlaced * 10;
+
+                if (totalLines > 0) {
+                    blastState.streak++;
+                    const lineBonus = totalLines * 100 * totalLines;
+                    const streakMultiplier = 1 + (blastState.streak - 1) * 0.5;
+                    const earned = Math.round(lineBonus * streakMultiplier);
+                    moveScore += earned;
+
+                    // Clear cells & spawn particles
+                    const toClear = new Set();
+                    fullRows.forEach(r => {
+                        for (let c = 0; c < 8; c++) toClear.add(`${r},${c}`);
+                    });
+                    fullCols.forEach(c => {
+                        for (let r = 0; r < 8; r++) toClear.add(`${r},${c}`);
+                    });
+
+                    toClear.forEach(key => {
+                        const [r, c] = key.split(',').map(Number);
+                        const colorObj = blastState.grid[r][c];
+                        const cx = metrics.boardX + (c + 0.5) * metrics.cellSize;
+                        const cy = metrics.boardY + (r + 0.5) * metrics.cellSize;
+                        spawnBurstParticles(cx, cy, colorObj ? colorObj.fill : '#ffffff', 7);
+                        blastState.grid[r][c] = null;
+                    });
+
+                    SoundFX.clear(totalLines);
+                    const badgeMsg = totalLines > 1
+                        ? `МЕГА ВЗРЫВ ×${totalLines}! +${moveScore}`
+                        : (blastState.streak > 1 ? `КОМБО ×${blastState.streak}! +${moveScore}` : `ЛИНИЯ! +${moveScore}`);
+                    showComboBadge(badgeMsg);
+                    spawnFloatingText(metrics.w / 2, metrics.boardY + metrics.boardSize / 2, `+${moveScore}`, '#fde047');
+                } else {
+                    blastState.streak = 0;
+                }
+
+                blastState.score += moveScore;
+                if (blastState.score > blastState.best) {
+                    blastState.best = blastState.score;
+                    Storage.set('vk_blast_best', blastState.best);
+                }
+
+                // Refill tray if all 3 placed
+                if (blastState.tray.every(t => t === null)) {
+                    spawnBlastTray();
+                }
+
+                updateUI();
+
+                // Check Game Over
+                if (!canAnyTrayPieceFit()) {
+                    blastState.isGameOver = true;
+                    SoundFX.gameOver();
+                    setTimeout(() => openGameOverModal(), 550);
+                }
+
+                return true;
+            }
+
+            // =========================================================================
+            // PARTICLES & VISUAL FEEDBACK
+            // =========================================================================
+            function spawnBurstParticles(x, y, color, count = 10) {
+                for (let i = 0; i < count; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 1.5 + Math.random() * 4.2;
+                    particles.push({
+                        x,
+                        y,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        size: 4 + Math.random() * 5,
+                        color,
+                        alpha: 1
+                    });
+                }
+            }
+
+            function spawnFloatingText(x, y, text, color = '#ffffff') {
+                floatingTexts.push({
+                    x,
+                    y,
+                    text,
+                    color,
+                    alpha: 1,
+                    vy: -1.4
+                });
+            }
+
+            let comboBadgeTimeout = null;
+            function showComboBadge(text) {
+                comboFloatingBadge.textContent = text;
+                comboFloatingBadge.classList.remove('opacity-0', '-translate-y-2');
+                comboFloatingBadge.classList.add('opacity-100', 'translate-y-0');
+                if (comboBadgeTimeout) clearTimeout(comboBadgeTimeout);
+                comboBadgeTimeout = setTimeout(() => {
+                    comboFloatingBadge.classList.remove('opacity-100', 'translate-y-0');
+                    comboFloatingBadge.classList.add('opacity-0', '-translate-y-2');
+                }, 1500);
+            }
+
+            let toastTimeout = null;
+            function showToast(msg) {
+                const toast = document.getElementById('toastNotification');
+                toast.textContent = msg;
+                toast.classList.remove('opacity-0');
+                toast.classList.add('opacity-100');
+                if (toastTimeout) clearTimeout(toastTimeout);
+                toastTimeout = setTimeout(() => {
+                    toast.classList.remove('opacity-100');
+                    toast.classList.add('opacity-0');
+                }, 2200);
+            }
+
+            // =========================================================================
+            // RENDERING ENGINE
+            // =========================================================================
+            function drawRoundedRect(x, y, w, h, r) {
+                ctx.beginPath();
+                ctx.moveTo(x + r, y);
+                ctx.lineTo(x + w - r, y);
+                ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+                ctx.lineTo(x + w, y + h - r);
+                ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+                ctx.lineTo(x + r, y + h);
+                ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+                ctx.lineTo(x, y + r);
+                ctx.quadraticCurveTo(x, y, x + r, y);
+                ctx.closePath();
+            }
+
+            function drawBeveledBlock(x, y, size, colorObj, alpha = 1) {
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                const pad = 1.8;
+                const bx = x + pad;
+                const by = y + pad;
+                const bs = size - pad * 2;
+                const rad = Math.max(4, bs * 0.2);
+
+                // Base block fill
+                drawRoundedRect(bx, by, bs, bs, rad);
+                ctx.fillStyle = colorObj.fill;
+                ctx.fill();
+
+                // Top-left inner gloss
+                ctx.strokeStyle = colorObj.light || 'rgba(255,255,255,0.35)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Inner shine bar
+                drawRoundedRect(bx + bs * 0.14, by + bs * 0.12, bs * 0.72, bs * 0.22, rad * 0.5);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            function renderBlastMode() {
+                const { boardX, boardY, boardSize, cellSize, trayY, trayH } = metrics;
+
+                // Board background
+                drawRoundedRect(boardX - 5, boardY - 5, boardSize + 10, boardSize + 10, 14);
+                ctx.fillStyle = '#131626';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // Grid slots & occupied blocks
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const cx = boardX + c * cellSize;
+                        const cy = boardY + r * cellSize;
+
+                        // Empty slot
+                        drawRoundedRect(cx + 2, cy + 2, cellSize - 4, cellSize - 4, 6);
+                        ctx.fillStyle = '#1e233a';
+                        ctx.fill();
+
+                        const cellColor = blastState.grid[r][c];
+                        if (cellColor) {
+                            drawBeveledBlock(cx, cy, cellSize, cellColor, 1);
+                        }
+                    }
+                }
+
+                // Ghost preview if dragging a piece
+                if (blastState.draggingIdx !== -1 && blastState.hoverR !== -1 && blastState.hoverC !== -1) {
+                    const item = blastState.tray[blastState.draggingIdx];
+                    if (item && canPlaceBlastShape(item.shape, blastState.hoverR, blastState.hoverC)) {
+                        for (let r = 0; r < item.shape.length; r++) {
+                            for (let c = 0; c < item.shape[r].length; c++) {
+                                if (item.shape[r][c]) {
+                                    const gx = boardX + (blastState.hoverC + c) * cellSize;
+                                    const gy = boardY + (blastState.hoverR + r) * cellSize;
+                                    drawBeveledBlock(gx, gy, cellSize, item.color, 0.42);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Tray slots
+                const slotW = metrics.w / 3;
+                for (let i = 0; i < 3; i++) {
+                    const item = blastState.tray[i];
+                    const slotCenterX = slotW * i + slotW / 2;
+                    const slotCenterY = trayY + trayH / 2;
+
+                    // Subtle tray card background
+                    drawRoundedRect(slotW * i + 6, trayY + 2, slotW - 12, trayH - 4, 12);
+                    ctx.fillStyle = 'rgba(30, 35, 58, 0.55)';
+                    ctx.fill();
+
+                    if (!item || blastState.draggingIdx === i) continue;
+
+                    if (item.scale < 1) {
+                        item.scale = Math.min(1, item.scale + 0.12);
+                    }
+
+                    const rows = item.shape.length;
+                    const cols = item.shape[0].length;
+                    const maxDim = Math.max(rows, cols, 3);
+                    const miniCell = Math.min(cellSize * 0.62, ( Math.min(slotW - 22, trayH - 16) / maxDim )) * item.scale;
+
+                    const shapeW = cols * miniCell;
+                    const shapeH = rows * miniCell;
+                    const startX = slotCenterX - shapeW / 2;
+                    const startY = slotCenterY - shapeH / 2;
+
+                    const fitsSomewhere = (() => {
+                        for (let r = 0; r < 8; r++) {
+                            for (let c = 0; c < 8; c++) {
+                                if (canPlaceBlastShape(item.shape, r, c)) return true;
+                            }
+                        }
+                        return false;
+                    })();
+
+                    for (let r = 0; r < rows; r++) {
+                        for (let c = 0; c < cols; c++) {
+                            if (item.shape[r][c]) {
+                                drawBeveledBlock(
+                                    startX + c * miniCell,
+                                    startY + r * miniCell,
+                                    miniCell,
+                                    item.color,
+                                    fitsSomewhere ? 1 : 0.35
+                                );
+                            }
+                        }
+                    }
+                }
+
+                // Active dragged piece following finger/cursor
+                if (blastState.draggingIdx !== -1) {
+                    const item = blastState.tray[blastState.draggingIdx];
+                    if (item) {
+                        const rows = item.shape.length;
+                        const cols = item.shape[0].length;
+                        const shapeW = cols * cellSize;
+                        const shapeH = rows * cellSize;
+                        const startX = blastState.dragX - shapeW / 2;
+                        const startY = blastState.dragY - shapeH / 2 - cellSize * 1.1; // Finger offset
+
+                        for (let r = 0; r < rows; r++) {
+                            for (let c = 0; c < cols; c++) {
+                                if (item.shape[r][c]) {
+                                    drawBeveledBlock(
+                                        startX + c * cellSize,
+                                        startY + r * cellSize,
+                                        cellSize,
+                                        item.color,
+                                        0.92
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            function renderLoop() {
+                ctx.clearRect(0, 0, metrics.w, metrics.h);
+
+                renderBlastMode();
+
+                // Update & draw particles
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const p = particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.14; // subtle gravity
+                    p.alpha -= 0.032;
+                    if (p.alpha <= 0) {
+                        particles.splice(i, 1);
+                        continue;
+                    }
+                    ctx.save();
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fillStyle = p.color;
+                    drawRoundedRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size, 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // Update & draw floating score texts
+                for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                    const ft = floatingTexts[i];
+                    ft.y += ft.vy;
+                    ft.alpha -= 0.024;
+                    if (ft.alpha <= 0) {
+                        floatingTexts.splice(i, 1);
+                        continue;
+                    }
+                    ctx.save();
+                    ctx.globalAlpha = ft.alpha;
+                    ctx.font = '900 18px Inter, sans-serif';
+                    ctx.fillStyle = ft.color;
+                    ctx.textAlign = 'center';
+                    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+                    ctx.shadowBlur = 6;
+                    ctx.fillText(ft.text, ft.x, ft.y);
+                    ctx.restore();
+                }
+
+                requestAnimationFrame(renderLoop);
+            }
+
+            // =========================================================================
+            // POINTER / TOUCH CONTROLS
+            // =========================================================================
+            function getCanvasPos(evt) {
+                const rect = canvas.getBoundingClientRect();
+                const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+                const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+                return {
+                    x: clientX - rect.left,
+                    y: clientY - rect.top
+                };
+            }
+
+            function handlePointerDown(evt) {
+                evt.preventDefault();
+                SoundFX.init();
+                const pos = getCanvasPos(evt);
+
+                // Hammer Booster execution
+                if (hammerActive) {
+                    const c = Math.floor((pos.x - metrics.boardX) / metrics.cellSize);
+                    const r = Math.floor((pos.y - metrics.boardY) / metrics.cellSize);
+                    if (r >= 0 && r < 8 && c >= 0 && c < 8 && blastState.grid[r][c] !== null) {
+                        const colObj = blastState.grid[r][c];
+                        blastState.grid[r][c] = null;
+                        blastState.hammers--;
+                        hammerActive = false;
+                        SoundFX.smash();
+                        spawnBurstParticles(
+                            metrics.boardX + (c + 0.5) * metrics.cellSize,
+                            metrics.boardY + (r + 0.5) * metrics.cellSize,
+                            colObj.fill,
+                            15
+                        );
+                        updateUI();
+                    }
+                    return;
+                }
+
+                if (blastState.isGameOver) return;
+                if (pos.y >= metrics.trayY - 12) {
+                    const slotIdx = Math.floor(pos.x / (metrics.w / 3));
+                    if (slotIdx >= 0 && slotIdx < 3 && blastState.tray[slotIdx]) {
+                        blastState.draggingIdx = slotIdx;
+                        blastState.dragX = pos.x;
+                        blastState.dragY = pos.y;
+                        SoundFX.pick();
+                        updateBlastHover(pos);
+                    }
+                }
+            }
+
+            function updateBlastHover(pos) {
+                if (blastState.draggingIdx === -1) return;
+                const item = blastState.tray[blastState.draggingIdx];
+                if (!item) return;
+
+                const rows = item.shape.length;
+                const cols = item.shape[0].length;
+                const shapeW = cols * metrics.cellSize;
+                const shapeH = rows * metrics.cellSize;
+                const topLeftX = pos.x - shapeW / 2;
+                const topLeftY = pos.y - shapeH / 2 - metrics.cellSize * 1.1;
+
+                const c = Math.round((topLeftX - metrics.boardX) / metrics.cellSize);
+                const r = Math.round((topLeftY - metrics.boardY) / metrics.cellSize);
+
+                if (canPlaceBlastShape(item.shape, r, c)) {
+                    blastState.hoverR = r;
+                    blastState.hoverC = c;
+                } else {
+                    blastState.hoverR = -1;
+                    blastState.hoverC = -1;
+                }
+            }
+
+            function handlePointerMove(evt) {
+                if (blastState.draggingIdx === -1) return;
+                evt.preventDefault();
+                const pos = getCanvasPos(evt);
+                blastState.dragX = pos.x;
+                blastState.dragY = pos.y;
+                updateBlastHover(pos);
+            }
+
+            function handlePointerUp() {
+                if (hammerActive) return;
+                if (blastState.draggingIdx === -1) return;
+                if (blastState.hoverR !== -1 && blastState.hoverC !== -1) {
+                    placeBlastPiece(blastState.draggingIdx, blastState.hoverR, blastState.hoverC);
+                }
+                blastState.draggingIdx = -1;
+                blastState.hoverR = -1;
+                blastState.hoverC = -1;
+            }
+
+            canvas.addEventListener('mousedown', handlePointerDown);
+            window.addEventListener('mousemove', handlePointerMove);
+            window.addEventListener('mouseup', handlePointerUp);
+
+            canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+            window.addEventListener('touchmove', handlePointerMove, { passive: false });
+            window.addEventListener('touchend', handlePointerUp);
+
+            // =========================================================================
+            // UI & CONTROLS BINDING
+            // =========================================================================
+            function updateUI() {
+                scoreDisplay.textContent = blastState.score.toLocaleString('ru-RU');
+                bestScoreDisplay.textContent = blastState.best.toLocaleString('ru-RU');
+                hammerCountEl.textContent = blastState.hammers;
+                rerollCountEl.textContent = blastState.rerolls;
+                streakValueEl.textContent = blastState.streak;
+
+                if (hammerActive) {
+                    hammerBanner.classList.remove('hidden');
+                } else {
+                    hammerBanner.classList.add('hidden');
+                }
+            }
+
+            // Sound Toggle
+            document.getElementById('btnToggleSound').addEventListener('click', () => {
+                SoundFX.enabled = !SoundFX.enabled;
+                document.getElementById('soundIcon').textContent = SoundFX.enabled ? '🔊' : '🔇';
+                showToast(SoundFX.enabled ? 'Звук включён' : 'Звук выключен');
+            });
+
+            // Hammer Booster
+            document.getElementById('btnUseHammer').addEventListener('click', () => {
+                if (blastState.hammers <= 0) {
+                    showToast('Молотки закончились!');
+                    return;
+                }
+                const hasAnyBlock = blastState.grid.some(row => row.some(cell => cell !== null));
+
+                if (!hasAnyBlock) {
+                    showToast('Поле пока пустое!');
+                    return;
+                }
+
+                hammerActive = !hammerActive;
+                updateUI();
+            });
+
+            document.getElementById('btnCancelHammer').addEventListener('click', () => {
+                hammerActive = false;
+                updateUI();
+            });
+
+            // Reroll Booster
+            document.getElementById('btnUseReroll').addEventListener('click', () => {
+                if (blastState.rerolls <= 0) {
+                    showToast('Обновления закончились!');
+                    return;
+                }
+                blastState.rerolls--;
+                SoundFX.pick();
+                spawnBlastTray();
+                updateUI();
+                showToast('Фигуры обновлены!');
+            });
+
+            // Restart Button
+            document.getElementById('btnRestartGame').addEventListener('click', () => {
+                initBlastGame();
+                showToast('Новая партия начата!');
+            });
+
+            // Game Over Modal
+            function openGameOverModal() {
+                document.getElementById('finalScoreText').textContent = blastState.score.toLocaleString('ru-RU');
+                document.getElementById('finalBestText').textContent = blastState.best.toLocaleString('ru-RU');
+                document.getElementById('modalGameOver').classList.remove('hidden');
+            }
+
+            document.getElementById('btnPlayAgainModal').addEventListener('click', () => {
+                document.getElementById('modalGameOver').classList.add('hidden');
+                initBlastGame();
+            });
+
+            document.getElementById('btnShareScoreModal').addEventListener('click', () => {
+                const shareText = `Я набрал ${blastState.score} очков в игре «Block Blast»! Попробуй обогнать мой рекорд (${blastState.best})! 🧩🔥`;
+                copyTextSafe(shareText);
+                showToast('Результат скопирован в буфер обмена!');
+            });
+
+            function copyTextSafe(text) {
+                try {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+                    } else {
+                        fallbackCopy(text);
+                    }
+                } catch (e) {
+                    fallbackCopy(text);
+                }
+            }
+
+            function fallbackCopy(text) {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); } catch (e) {}
+                document.body.removeChild(ta);
+            }
+
+            // Leaderboard Modal
+            function renderLeaderboard() {
+                const userBest = Math.max(blastState.best, blastState.score);
+                const rivals = [
+                    { name: 'Алексей В.', score: 14850, badge: '💎' },
+                    { name: 'Мария К.', score: 9420, badge: '🔥' },
+                    { name: 'Дмитрий Б.', score: 6800, badge: '⚡' },
+                    { name: 'Кирилл С.', score: 4250, badge: '🎯' },
+                    { name: 'Алина М.', score: 2100, badge: '🌟' },
+                    { name: playerName, score: userBest, isUser: true, badge: '👑' }
+                ].sort((a, b) => b.score - a.score);
+
+                const container = document.getElementById('leaderboardList');
+                container.innerHTML = rivals.map((entry, idx) => {
+                    const rankColors = idx === 0 ? 'text-amber-400 font-black' : (idx === 1 ? 'text-slate-200 font-bold' : (idx === 2 ? 'text-amber-600 font-bold' : 'text-slate-400 font-semibold'));
+                    const bgClass = entry.isUser
+                        ? 'bg-indigo-600/25 border-indigo-500/50'
+                        : 'bg-slate-900/70 border-white/5';
+                    return `
+                        <div class="flex items-center justify-between px-3.5 py-2.5 rounded-xl border ${bgClass}">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-5 text-xs ${rankColors}">#${idx + 1}</span>
+                                <span class="text-sm">${entry.badge}</span>
+                                <span class="text-xs font-bold ${entry.isUser ? 'text-indigo-200' : 'text-white'}">${entry.name}</span>
+                            </div>
+                            <span class="text-xs font-extrabold text-amber-300 tabular-nums">${entry.score.toLocaleString('ru-RU')}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            document.getElementById('btnOpenLeaderboard').addEventListener('click', () => {
+                document.getElementById('playerNameInput').value = playerName;
+                renderLeaderboard();
+                document.getElementById('modalLeaderboard').classList.remove('hidden');
+            });
+
+            document.getElementById('btnCloseLeaderboard').addEventListener('click', () => {
+                document.getElementById('modalLeaderboard').classList.add('hidden');
+            });
+
+            document.getElementById('btnSavePlayerName').addEventListener('click', () => {
+                const val = document.getElementById('playerNameInput').value.trim();
+                if (val) {
+                    playerName = val;
+                    Storage.set('vk_game_player_name', playerName);
+                    renderLeaderboard();
+                    showToast('Имя сохранено!');
+                }
+            });
+
+            // Publish Guide Modal
+            document.getElementById('btnOpenPublish').addEventListener('click', () => {
+                document.getElementById('modalPublish').classList.remove('hidden');
+            });
+            document.getElementById('btnClosePublish').addEventListener('click', () => {
+                document.getElementById('modalPublish').classList.add('hidden');
+            });
+            document.getElementById('btnGotItPublish').addEventListener('click', () => {
+                document.getElementById('modalPublish').classList.add('hidden');
+            });
+
+            // Rules Modal
+            document.getElementById('btnOpenRules').addEventListener('click', () => {
+                document.getElementById('modalRules').classList.remove('hidden');
+            });
+            document.getElementById('btnCloseRules').addEventListener('click', () => {
+                document.getElementById('modalRules').classList.add('hidden');
+            });
+            document.getElementById('btnCloseRulesBottom').addEventListener('click', () => {
+                document.getElementById('modalRules').classList.add('hidden');
+            });
+
+            // Start game on load
+            window.addEventListener('resize', resizeCanvas);
+            window.addEventListener('load', () => {
+                initBlastGame();
+                resizeCanvas();
+                requestAnimationFrame(renderLoop);
+            });
+        })();
+    </script>
+</body>
+</html>
